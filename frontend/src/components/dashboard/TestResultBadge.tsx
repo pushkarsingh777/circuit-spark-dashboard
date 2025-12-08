@@ -8,7 +8,7 @@ interface TestResultBadgeProps {
 
 export function TestResultBadge({ result, size = "md" }: TestResultBadgeProps) {
   const isPass = result === "pass";
-  
+
   const sizeClasses = {
     sm: "px-2 py-1 text-xs gap-1",
     md: "px-3 py-1.5 text-sm gap-1.5",
@@ -20,6 +20,9 @@ export function TestResultBadge({ result, size = "md" }: TestResultBadgeProps) {
     md: 16,
     lg: 20,
   };
+
+  // ✅ Console log to ensure connection
+  console.log(`TestResultBadge Rendered → Result: ${result}, Size: ${size}`);
 
   return (
     <span

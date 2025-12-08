@@ -1,4 +1,5 @@
-import { DashboardCard, CardHeader } from "./DashboardCard";
+import { useEffect } from "react";
+import { DashboardCard } from "./DashboardCard";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
 interface OpeningEventChartProps {
@@ -7,6 +8,19 @@ interface OpeningEventChartProps {
 }
 
 export function OpeningEventChart({ data, tripInfo }: OpeningEventChartProps) {
+
+  // 🔥 Backend Connectivity Check
+  useEffect(() => {
+    fetch("http://127.0.0.1:5000/")
+      .then((res) => res.json())
+      .then((data) => {
+        console.log("OpeningEventChart Connected to Flask:", data.message);
+      })
+      .catch((error) => {
+        console.error("OpeningEventChart Failed to Connect:", error);
+      });
+  }, []);
+
   return (
     <DashboardCard>
       <div className="flex justify-between items-start mb-4">

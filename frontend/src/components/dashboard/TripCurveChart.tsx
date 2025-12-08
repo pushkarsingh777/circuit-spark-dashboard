@@ -13,7 +13,7 @@ export function TripCurveChart({ data, mcbType }: TripCurveChartProps) {
     for (let i = 1; i <= 20; i++) {
       const current = i;
       let time: number;
-      
+
       switch (mcbType) {
         case "B":
           time = current < 3 ? 100 / current : current < 5 ? 10 / current : 0.1;
@@ -27,13 +27,16 @@ export function TripCurveChart({ data, mcbType }: TripCurveChartProps) {
         default:
           time = 100 / current;
       }
-      
+
       points.push({ current, time: Math.max(0.01, time) });
     }
     return points;
   };
 
   const curveData = generateCurve();
+
+  // 🔥 Print to console to ensure connection
+  console.log("🚀 TripCurveChart Rendered → MCB Type:", mcbType, "Curve Points:", curveData, "Actual Data:", data);
 
   return (
     <DashboardCard>

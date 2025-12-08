@@ -1,6 +1,7 @@
-import { DashboardCard, CardHeader, CardFooter } from "./DashboardCard";
+import { useEffect } from "react";
+import { DashboardCard, CardFooter } from "./DashboardCard";
 import { StatusBadge } from "./StatusBadge";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 interface LiveChartProps {
   title: string;
@@ -27,6 +28,19 @@ export function LiveChart({
   lastTime,
   unit = "A",
 }: LiveChartProps) {
+
+  // 🔥 Backend Connectivity Check
+  useEffect(() => {
+    fetch("http://127.0.0.1:5000/")
+      .then((res) => res.json())
+      .then((data) => {
+        console.log("LiveChart Connected to Flask:", data.message);
+      })
+      .catch((error) => {
+        console.error("LiveChart Failed to Connect:", error);
+      });
+  }, []);
+
   return (
     <DashboardCard>
       <div className="flex justify-between items-start mb-4">
@@ -56,19 +70,8 @@ export function LiveChart({
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
-            <XAxis
-              dataKey="time"
-              stroke="hsl(var(--muted-foreground))"
-              fontSize={12}
-              tickLine={false}
-              axisLine={false}
-            />
-            <YAxis
-              stroke="hsl(var(--muted-foreground))"
-              fontSize={12}
-              tickLine={false}
-              axisLine={false}
-            />
+            <XAxis dataKey="time" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
+            <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
             <Tooltip
               contentStyle={{
                 backgroundColor: "hsl(var(--card))",
@@ -78,13 +81,7 @@ export function LiveChart({
               }}
               labelStyle={{ color: "hsl(var(--foreground))" }}
             />
-            <Area
-              type="monotone"
-              dataKey="value"
-              stroke={color}
-              strokeWidth={2}
-              fill={`url(#${gradientId})`}
-            />
+            <Area type="monotone" dataKey="value" stroke={color} strokeWidth={2} fill={`url(#${gradientId})`} />
           </AreaChart>
         </ResponsiveContainer>
       </div>
@@ -92,9 +89,7 @@ export function LiveChart({
       {(status || lastTime) && (
         <CardFooter>
           {status && <StatusBadge status={status} label={`Status: ${status.charAt(0).toUpperCase() + status.slice(1)}`} />}
-          {lastTime && (
-            <span className="text-sm text-muted-foreground">Last: {lastTime}</span>
-          )}
+          {lastTime && <span className="text-sm text-muted-foreground">Last: {lastTime}</span>}
         </CardFooter>
       )}
     </DashboardCard>

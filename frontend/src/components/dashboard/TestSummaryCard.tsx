@@ -86,7 +86,7 @@ export function TestSummaryCard({
               {recentTests.length > 0 ? (
                 recentTests.map((test, index) => (
                   <tr
-                    key={test.id}
+                    key={`${test.id}-${index}`} // ✅ Unique key
                     className={cn(
                       "border-t border-border/30 transition-colors",
                       test.result === "pass"

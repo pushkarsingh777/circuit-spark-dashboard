@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Download, Zap } from "lucide-react";
 
@@ -6,6 +7,19 @@ interface DashboardHeaderProps {
 }
 
 export function DashboardHeader({ onExportCSV }: DashboardHeaderProps) {
+
+  // 🔥 Backend Connectivity Check
+  useEffect(() => {
+    fetch("http://127.0.0.1:5000/")
+      .then((res) => res.json())
+      .then((data) => {
+        console.log("DashboardHeader Connected to Flask:", data.message);
+      })
+      .catch((error) => {
+        console.error("Dashboard Header Failed to Connect:", error);
+      });
+  }, []);
+
   return (
     <header className="glass-card rounded-2xl p-5 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
       <div className="flex items-center gap-3">

@@ -20,6 +20,9 @@ export function TestSettingsCard({
   onRunTest,
   isRunning,
 }: TestSettingsCardProps) {
+  // ✅ Console log to ensure connection
+  console.log("TestSettingsCard Rendered →", { mcbType, faultCurrent, isRunning });
+
   return (
     <DashboardCard>
       <CardHeader title="Test Settings" subtitle="Configure MCB parameters" />
