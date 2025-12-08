@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { ProgressCircle } from "@/components/dashboard/ProgressCircle";
 import { StatusPipeline } from "@/components/dashboard/StatusPipeline";
@@ -9,6 +9,9 @@ import { ActivityLog } from "@/components/dashboard/ActivityLog";
 import { BarChart } from "@/components/dashboard/BarChart";
 import { WorkloadBar } from "@/components/dashboard/WorkloadBar";
 import { TestResultBadge } from "@/components/dashboard/TestResultBadge";
+import { LiveChart } from "@/components/dashboard/LiveChart";
+import { TripCurveChart } from "@/components/dashboard/TripCurveChart";
+import { OpeningEventChart } from "@/components/dashboard/OpeningEventChart";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
@@ -37,6 +40,55 @@ const Index = () => {
     { id: "T-004", type: "D", result: "pass", peakCurrent: 456.1, timestamp: "09:48:33", duration: 5.4 },
     { id: "T-005", type: "B", result: "pass", peakCurrent: 135.0, timestamp: "09:30:12", duration: 3.1 },
   ]);
+
+  // Live chart data state
+  const [currentData, setCurrentData] = useState<{ time: number; value: number }[]>([]);
+  const [openingEventData, setOpeningEventData] = useState<{ time: number; voltage: number; current: number }[]>([]);
+  const [tripCurveData, setTripCurveData] = useState<{ current: number; time: number }[]>([]);
+  const [peakCurrent, setPeakCurrent] = useState(0);
+  const [powerFactor, setPowerFactor] = useState(0.95);
+  const [lastUpdateTime, setLastUpdateTime] = useState("--");
+
+  // Generate initial chart data
+  useEffect(() => {
+    const generateCurrentData = () => Array.from({ length: 50 }, (_, i) => ({
+      time: i * 20,
+      value: Math.sin(i * 0.3) * 80 + 100 + Math.random() * 20,
+    }));
+
+    const generateOpeningData = () => Array.from({ length: 30 }, (_, i) => ({
+      time: i * 2,
+      voltage: 230 * Math.exp(-i * 0.1) * (1 + Math.random() * 0.1),
+      current: 500 * Math.exp(-i * 0.15) * (1 + Math.random() * 0.15),
+    }));
+
+    const generateTripData = () => [
+      { current: 3, time: 0.5 },
+      { current: 5, time: 0.1 },
+      { current: 10, time: 0.02 },
+    ];
+
+    setCurrentData(generateCurrentData());
+    setOpeningEventData(generateOpeningData());
+    setTripCurveData(generateTripData());
+    setPeakCurrent(145.2);
+    setLastUpdateTime(new Date().toLocaleTimeString());
+  }, []);
+
+  // Update charts during test
+  useEffect(() => {
+    if (!isRunning) return;
+    const interval = setInterval(() => {
+      setCurrentData(prev => {
+        const newPoint = { time: (prev[prev.length - 1]?.time || 0) + 20, value: Math.sin(Date.now() * 0.005) * 100 + 150 + Math.random() * 30 };
+        return [...prev.slice(-49), newPoint];
+      });
+      setPeakCurrent(prev => Math.max(prev, 100 + Math.random() * 150));
+      setPowerFactor(0.85 + Math.random() * 0.1);
+      setLastUpdateTime(new Date().toLocaleTimeString());
+    }, 200);
+    return () => clearInterval(interval);
+  }, [isRunning]);
 
   const getPipelineStatus = (step: string): "completed" | "in-progress" | "waiting" => {
     if (step === "Setup") return status === "idle" ? "waiting" : "completed";
@@ -204,7 +256,7 @@ const Index = () => {
         </div>
 
         {/* Third Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 mb-5">
           <SummarySection title="Test Summary" items={[{ label: "Date", value: new Date().toLocaleDateString() }, { label: "MCB Type", value: `Type ${mcbType}` }, { label: "Fault Current", value: `${faultCurrent} kA` }, { label: "Status", value: status === "idle" ? "Ready" : status.charAt(0).toUpperCase() + status.slice(1) }]} highlightLast />
           <BarChart title="Test Duration (seconds)" data={testDurationData} />
           <div className="bg-card rounded-2xl border border-border overflow-hidden">
@@ -221,6 +273,24 @@ const Index = () => {
               <tbody>{upcomingTests.map((t, i) => <tr key={i} className="border-b border-border/50"><td className="px-3 py-2">{t.type}</td><td className="px-3 py-2">{t.deadline}</td><td className="px-3 py-2"><WorkloadBar value={t.workload} /></td></tr>)}</tbody>
             </table>
           </div>
+        </div>
+
+        {/* Fourth Row - Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <LiveChart
+            title="Live Current"
+            subtitle="Real-time current measurement"
+            data={currentData}
+            color="hsl(var(--primary))"
+            gradientId="currentGradient"
+            status={status}
+            peakValue={peakCurrent}
+            powerFactor={powerFactor}
+            lastTime={lastUpdateTime}
+            unit="A"
+          />
+          <TripCurveChart data={tripCurveData} mcbType={mcbType} />
+          <OpeningEventChart data={openingEventData} tripInfo={`Last trip: ${lastUpdateTime}`} />
         </div>
       </div>
     </div>
