@@ -15,7 +15,9 @@ import { OpeningEventChart } from "@/components/dashboard/OpeningEventChart";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { Play, Zap, Calendar } from "lucide-react";
+import { Play, Zap, Calendar, RefreshCw } from "lucide-react";
+import { supabase, TestResult as SupabaseTestResult, ActivityLog as SupabaseActivityLog } from "@/lib/supabase";
+import { seedDummyData } from "@/lib/seed-data";
 
 interface TestResult {
   id: string;
@@ -34,13 +36,9 @@ const Index = () => {
   const [status, setStatus] = useState<"idle" | "running" | "pass" | "fail">("idle");
   const [testProgress, setTestProgress] = useState(0);
   const [passRate, setPassRate] = useState(75);
-  const [recentTests, setRecentTests] = useState<TestResult[]>([
-    { id: "T-001", type: "B", result: "pass", peakCurrent: 145.2, timestamp: "10:23:45", duration: 3.4 },
-    { id: "T-002", type: "C", result: "fail", peakCurrent: 312.8, timestamp: "10:15:22", duration: 4.3 },
-    { id: "T-003", type: "B", result: "pass", peakCurrent: 128.5, timestamp: "10:02:18", duration: 2.6 },
-    { id: "T-004", type: "D", result: "pass", peakCurrent: 456.1, timestamp: "09:48:33", duration: 5.4 },
-    { id: "T-005", type: "B", result: "pass", peakCurrent: 135.0, timestamp: "09:30:12", duration: 3.1 },
-  ]);
+  const [recentTests, setRecentTests] = useState<TestResult[]>([]);
+  const [activityLogs, setActivityLogs] = useState<{ type: "success" | "warning" | "comment"; title: string; description: string; time: string; link?: string }[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Live chart data state
   const [currentData, setCurrentData] = useState<{ time: number; value: number }[]>([]);
@@ -49,6 +47,101 @@ const Index = () => {
   const [peakCurrent, setPeakCurrent] = useState(0);
   const [powerFactor, setPowerFactor] = useState(0.95);
   const [lastUpdateTime, setLastUpdateTime] = useState("--");
+
+  // Fetch data from Supabase
+  const fetchTestResults = async () => {
+    const { data, error } = await supabase
+      .from('test_results')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (error) {
+      console.error('Error fetching test results:', error);
+      return;
+    }
+
+    if (data) {
+      const mapped: TestResult[] = data.map((t: SupabaseTestResult) => ({
+        id: `T-${t.id.slice(0, 3).toUpperCase()}`,
+        type: t.mcb_type,
+        result: t.result,
+        peakCurrent: t.trip_time * 3 + 100,
+        timestamp: new Date(t.created_at).toLocaleTimeString(),
+        duration: t.trip_time / 10,
+      }));
+      setRecentTests(mapped);
+      
+      const passed = data.filter(t => t.result === 'pass').length;
+      setPassRate(Math.round((passed / data.length) * 100) || 0);
+    }
+  };
+
+  const fetchActivityLogs = async () => {
+    const { data, error } = await supabase
+      .from('activity_logs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (error) {
+      console.error('Error fetching activity logs:', error);
+      return;
+    }
+
+    if (data) {
+      const mapped = data.map((log: SupabaseActivityLog) => ({
+        type: log.action.toLowerCase().includes('fail') ? 'warning' as const : 
+              log.action.toLowerCase().includes('completed') || log.action.toLowerCase().includes('pass') ? 'success' as const : 'comment' as const,
+        title: log.action,
+        description: log.details,
+        time: getRelativeTime(new Date(log.created_at)),
+        link: log.action.includes('Test') ? 'View report' : undefined,
+      }));
+      setActivityLogs(mapped);
+    }
+  };
+
+  const getRelativeTime = (date: Date) => {
+    const diff = Date.now() - date.getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins} min`;
+    return `${Math.floor(mins / 60)} hr`;
+  };
+
+  // Initialize and set up real-time subscriptions
+  useEffect(() => {
+    const init = async () => {
+      setIsLoading(true);
+      await seedDummyData();
+      await fetchTestResults();
+      await fetchActivityLogs();
+      setIsLoading(false);
+    };
+    init();
+
+    // Real-time subscription for test results
+    const testChannel = supabase
+      .channel('test-results-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'test_results' }, () => {
+        fetchTestResults();
+      })
+      .subscribe();
+
+    // Real-time subscription for activity logs
+    const activityChannel = supabase
+      .channel('activity-logs-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'activity_logs' }, () => {
+        fetchActivityLogs();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(testChannel);
+      supabase.removeChannel(activityChannel);
+    };
+  }, []);
 
   // Generate initial chart data
   useEffect(() => {
@@ -124,30 +217,30 @@ const Index = () => {
     color: t.result === "pass" ? "hsl(var(--success))" : "hsl(var(--destructive))",
   }));
 
-  const activityLogs = [
-    { type: "success" as const, title: "Test T-001 completed", description: "MCB Type B passed at 145.2A", time: "5 min", link: "View report" },
-    { type: "warning" as const, title: "Test T-002 failed", description: "MCB Type C exceeded threshold", time: "12 min", link: "View details" },
-    { type: "comment" as const, title: "Configuration updated", description: "Fault current changed to 6kA", time: "25 min" },
-  ];
-
   const upcomingTests = [
     { type: "B", description: "Standard load test", deadline: "Today", workload: 14 },
     { type: "C", description: "High inrush test", deadline: "Tomorrow", workload: 50 },
     { type: "D", description: "Motor starting test", deadline: "Dec 10", workload: 30 },
   ];
 
-  const runTest = useCallback(() => {
+  const runTest = useCallback(async () => {
     setIsRunning(true);
     setStatus("running");
     setTestProgress(0);
     
     toast({ title: "Test Started", description: `Running MCB Type ${mcbType} test at ${faultCurrent} kA, PF: ${inputPowerFactor}` });
 
+    // Log activity
+    await supabase.from('activity_logs').insert({
+      action: 'Test Started',
+      details: `MCB Type ${mcbType} at ${faultCurrent}kA, PF: ${inputPowerFactor}`,
+    });
+
     const progressInterval = setInterval(() => {
       setTestProgress(prev => Math.min(prev + 15, 95));
     }, 400);
 
-    setTimeout(() => {
+    setTimeout(async () => {
       clearInterval(progressInterval);
       setTestProgress(100);
       setIsRunning(false);
@@ -155,30 +248,30 @@ const Index = () => {
       const result: "pass" | "fail" = Math.random() > 0.3 ? "pass" : "fail";
       setStatus(result);
       
-      const peak = Math.random() * 200 + 100;
-      const duration = Math.random() * 3 + 2;
-      const timeStr = new Date().toLocaleTimeString();
+      const tripTime = Math.round(Math.random() * 30 + 30);
 
-      const newResult: TestResult = {
-        id: `T-${String(recentTests.length + 2).padStart(3, "0")}`,
-        type: mcbType,
+      // Save to Supabase
+      await supabase.from('test_results').insert({
+        mcb_type: mcbType,
+        fault_current: parseInt(faultCurrent),
+        power_factor: parseFloat(inputPowerFactor),
+        trip_time: tripTime,
         result,
-        peakCurrent: Math.round(peak * 10) / 10,
-        timestamp: timeStr,
-        duration: Math.round(duration * 10) / 10,
-      };
+      });
 
-      setRecentTests((prev) => [newResult, ...prev.slice(0, 4)]);
-      const passed = recentTests.filter(t => t.result === "pass").length + (result === "pass" ? 1 : 0);
-      setPassRate(Math.round((passed / (recentTests.length + 1)) * 100));
+      // Log activity
+      await supabase.from('activity_logs').insert({
+        action: result === 'pass' ? 'Test Completed' : 'Test Failed',
+        details: `Result: ${result.toUpperCase()} - Trip time ${tripTime}ms`,
+      });
 
       toast({
         title: result === "pass" ? "✓ Test Passed" : "✗ Test Failed",
-        description: `Peak current: ${peak.toFixed(1)} A`,
+        description: `Trip time: ${tripTime}ms`,
         variant: result === "pass" ? "default" : "destructive",
       });
     }, 3000);
-  }, [mcbType, faultCurrent, recentTests]);
+  }, [mcbType, faultCurrent, inputPowerFactor]);
 
   const handleExportCSV = () => {
     const csvContent = [
@@ -196,11 +289,35 @@ const Index = () => {
     toast({ title: "Export Complete", description: "CSV file downloaded successfully" });
   };
 
+  const handleRefresh = async () => {
+    setIsLoading(true);
+    await fetchTestResults();
+    await fetchActivityLogs();
+    setIsLoading(false);
+    toast({ title: "Data Refreshed", description: "Latest data loaded from database" });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Loading dashboard data...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
-        <DashboardHeader onExportCSV={handleExportCSV} />
-        <p className="text-sm text-muted-foreground mb-6">Track key performance indicators of MCB testing including pass/fail rates, test duration, and upcoming tests.</p>
+        <div className="flex items-center justify-between mb-2">
+          <DashboardHeader onExportCSV={handleExportCSV} />
+          <Button variant="outline" size="sm" onClick={handleRefresh}>
+            <RefreshCw className="h-4 w-4 mr-2" /> Refresh
+          </Button>
+        </div>
+        <p className="text-sm text-muted-foreground mb-6">Track key performance indicators of MCB testing including pass/fail rates, test duration, and upcoming tests. <span className="text-primary font-medium">Real-time connected to Supabase</span></p>
 
         {/* Top Row */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 mb-5">
@@ -266,7 +383,7 @@ const Index = () => {
               <tbody>{recentTests.filter(t => t.result === "fail").map(t => <tr key={t.id} className="border-b border-border/50"><td className="px-3 py-2">{t.id}</td><td className="px-3 py-2">{t.type}</td><td className="px-3 py-2 text-right">{t.peakCurrent}A</td></tr>)}</tbody>
             </table>
           </div>
-          <ActivityLog title="Test Log" entries={activityLogs} />
+          <ActivityLog title="Test Log" entries={activityLogs.length > 0 ? activityLogs : [{ type: 'comment', title: 'No activity yet', description: 'Run a test to see logs', time: 'now' }]} />
         </div>
 
         {/* Third Row */}
