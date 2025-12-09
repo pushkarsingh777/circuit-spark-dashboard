@@ -44,10 +44,22 @@ export function OpeningEventChart({ data, tripInfo }: OpeningEventChartProps) {
               label={{ value: "Time (ms)", position: "bottom", fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
             />
             <YAxis
-              stroke="hsl(var(--muted-foreground))"
+              yAxisId="voltage"
+              orientation="left"
+              stroke="hsl(var(--warning))"
               fontSize={12}
               tickLine={false}
               axisLine={false}
+              label={{ value: "V", angle: -90, position: "insideLeft", fontSize: 11, fill: "hsl(var(--warning))" }}
+            />
+            <YAxis
+              yAxisId="current"
+              orientation="right"
+              stroke="hsl(var(--primary))"
+              fontSize={12}
+              tickLine={false}
+              axisLine={false}
+              label={{ value: "A", angle: 90, position: "insideRight", fontSize: 11, fill: "hsl(var(--primary))" }}
             />
             <Tooltip
               contentStyle={{
@@ -59,6 +71,7 @@ export function OpeningEventChart({ data, tripInfo }: OpeningEventChartProps) {
             />
             <Legend />
             <Line
+              yAxisId="voltage"
               type="monotone"
               dataKey="voltage"
               name="Voltage (V)"
@@ -67,6 +80,7 @@ export function OpeningEventChart({ data, tripInfo }: OpeningEventChartProps) {
               dot={false}
             />
             <Line
+              yAxisId="current"
               type="monotone"
               dataKey="current"
               name="Current (A)"
