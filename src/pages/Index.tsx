@@ -29,6 +29,7 @@ interface TestResult {
 const Index = () => {
   const [mcbType, setMcbType] = useState("B");
   const [faultCurrent, setFaultCurrent] = useState("6");
+  const [inputPowerFactor, setInputPowerFactor] = useState("0.85");
   const [isRunning, setIsRunning] = useState(false);
   const [status, setStatus] = useState<"idle" | "running" | "pass" | "fail">("idle");
   const [testProgress, setTestProgress] = useState(0);
@@ -140,7 +141,7 @@ const Index = () => {
     setStatus("running");
     setTestProgress(0);
     
-    toast({ title: "Test Started", description: `Running MCB Type ${mcbType} test at ${faultCurrent} kA` });
+    toast({ title: "Test Started", description: `Running MCB Type ${mcbType} test at ${faultCurrent} kA, PF: ${inputPowerFactor}` });
 
     const progressInterval = setInterval(() => {
       setTestProgress(prev => Math.min(prev + 15, 95));
@@ -237,6 +238,19 @@ const Index = () => {
                   <SelectContent>
                     <SelectItem value="6">6 kA</SelectItem>
                     <SelectItem value="10">10 kA</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="block text-xs text-muted-foreground mb-1.5">Power Factor</label>
+                <Select value={inputPowerFactor} onValueChange={setInputPowerFactor}>
+                  <SelectTrigger className="h-10 bg-muted/50"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0.80">0.80</SelectItem>
+                    <SelectItem value="0.85">0.85</SelectItem>
+                    <SelectItem value="0.90">0.90</SelectItem>
+                    <SelectItem value="0.95">0.95</SelectItem>
+                    <SelectItem value="1.00">1.00 (Unity)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
